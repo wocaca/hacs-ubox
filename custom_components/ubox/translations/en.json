@@ -1,0 +1,31 @@
+{
+  "flow": {
+    "user": {
+      "title": "UBox",
+      "description": "Proxy = Add-on MJPEG (1080p, recommended). Relay = pure Python (snapshot, experimental)."
+    },
+    "proxy": {
+      "title": "UBox proxy",
+      "data": {
+        "host": "Add-on host (HASS IP)",
+        "port": "Add-on port"
+      }
+    },
+    "relay": {
+      "title": "UBox relay (experimental)",
+      "data": {
+        "uid": "Camera UID",
+        "username": "Device login (admin)",
+        "password": "Device password",
+        "relay": "Relay host:port",
+        "stream": "Stream type (0 = SUB)",
+        "scan_interval": "Poll interval seconds (>=10)"
+      },
+      "description": "Experimental: 360p IDR snapshot only. 1080p live needs proxy mode."
+    }
+  },
+  "error": {
+    "required": "This field is required.",
+    "invalid": "Invalid value."
+  }
+}

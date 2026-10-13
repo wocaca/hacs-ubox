@@ -1,0 +1,31 @@
+{
+  "flow": {
+    "user": {
+      "title": "UBox",
+      "description": "代理 = Add-on MJPEG（1080p，推荐）。直连 = 纯 Python 中继（快照，实验性）。"
+    },
+    "proxy": {
+      "title": "UBox 代理",
+      "data": {
+        "host": "Add-on 主机（HASS IP）",
+        "port": "Add-on 端口"
+      }
+    },
+    "relay": {
+      "title": "UBox 中继（实验性）",
+      "data": {
+        "uid": "摄像头 UID",
+        "username": "设备账号（admin）",
+        "password": "设备密码",
+        "relay": "中继 host:port",
+        "stream": "码流类型（0 = 子码流）",
+        "scan_interval": "轮询间隔秒（>=10）"
+      },
+      "description": "实验性：仅 360p IDR 快照。要 1080p 实时请用代理模式。"
+    }
+  },
+  "error": {
+    "required": "此项必填。",
+    "invalid": "值无效。"
+  }
+}
