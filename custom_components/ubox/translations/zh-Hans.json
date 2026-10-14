@@ -1,30 +1,8 @@
 {
   "flow": {
     "user": {
-      "title": "UBox",
-      "description": "代理 = Add-on MJPEG 摄像头。直连 = 纯 Python P2P 摄像头。云端 = 账号设备/用户/快照（实时视频事后在配置里加）。"
-    },
-    "proxy": {
-      "title": "UBox 代理摄像头",
-      "data": {
-        "host": "Add-on 主机（HASS IP）",
-        "port": "Add-on 端口"
-      }
-    },
-    "relay": {
-      "title": "UBox 中继摄像头（实验性）",
-      "data": {
-        "uid": "摄像头 UID",
-        "username": "设备账号（admin）",
-        "password": "设备密码",
-        "relay": "中继 host:port",
-        "stream": "码流类型（0 = 子码流）",
-        "scan_interval": "轮询间隔秒（>=10）"
-      },
-      "description": "实验性：仅 360p IDR 快照。要 1080p 实时请用代理模式。"
-    },
-    "cloud": {
-      "title": "UBox 云端（账号登录）",
+      "title": "UBox 云端登录",
+      "description": "只输云账号密码，登录并拉设备列表。摄像头（实时/中继）事后在条目“配置”里加。",
       "data": {
         "account": "UBox 账号（手机/邮箱）",
         "password": "账号密码",
@@ -35,18 +13,25 @@
   "options": {
     "step": {
       "init": {
-        "title": "UBox 实时视频",
-        "description": "Add-on MJPEG 地址，配出实时摄像头实体。主机留空=不要实时实体。",
+        "title": "UBox 摄像头",
+        "description": "实时视频填 Add-on 主机；中继摄像头填 UID/密码/中继。全留空=都不要。",
         "data": {
-          "host": "Add-on 主机（HASS IP，空=不要）",
-          "port": "Add-on 端口"
+          "host": "Add-on 主机（HASS IP，空=不要实时）",
+          "port": "Add-on 端口",
+          "relay_uid": "中继摄像头 UID（空=不要中继）",
+          "relay_username": "设备账号",
+          "relay_password": "设备密码",
+          "relay": "中继 host:port",
+          "relay_stream": "码流类型（0 = 子码流）",
+          "scan_interval": "中继轮询间隔秒（>=10）"
         }
       }
     }
   },
   "config": {
     "abort": {
-      "camera_no_options": "摄像头条目没有额外选项。"
+      "camera_no_options": "摄像头条目没有额外选项。",
+      "use_cloud_first": "请先添加 UBox 云账号，摄像头在条目“配置”里加。"
     }
   },
   "error": {

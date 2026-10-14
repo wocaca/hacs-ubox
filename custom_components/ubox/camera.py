@@ -35,9 +35,14 @@ async def async_setup_entry(
 ) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
     if isinstance(data, dict) and data.get("entry_kind") == MODE_CLOUD:
-        # cloud entry: optional live camera via Add-on MJPEG (host set in flow)
+        # cloud entry: cameras attached later via Configure (options)
+        ents = []
         if data.get(CONF_HOST):
-            async_add_entities([UboxProxyCamera(hass, entry, data)])
+            ents.append(UboxProxyCamera(hass, entry, data))
+        if data.get("relay"):
+            ents.append(UboxRelayCamera(hass, entry, dict(data["relay"])))
+        if ents:
+            async_add_entities(ents)
         return
     if data.get(CONF_MODE, MODE_PROXY) == MODE_PROXY:
         async_add_entities([UboxProxyCamera(hass, entry, data)])

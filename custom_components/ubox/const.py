@@ -23,6 +23,12 @@ DEFAULT_STREAM = 0
 DEFAULT_SCAN = 30
 DEFAULT_USERNAME = "admin"
 
+# ---- options-attached relay camera (per cloud entry) ----
+CONF_RELAY_UID = "relay_uid"
+CONF_RELAY_USERNAME = "relay_username"
+CONF_RELAY_PASSWORD = "relay_password"
+CONF_RELAY_STREAM = "relay_stream"
+
 # ---- cloud sensors (UBox account, portal.ubianet.com) ----
 CONF_ACCOUNT = "account"
 CONF_REGION = "region"

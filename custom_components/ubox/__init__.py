@@ -15,8 +15,17 @@ from .const import (
     CONF_PASSWORD,
     CONF_PORT,
     CONF_REGION,
+    CONF_RELAY,
+    CONF_RELAY_PASSWORD,
+    CONF_RELAY_STREAM,
+    CONF_RELAY_UID,
+    CONF_RELAY_USERNAME,
+    CONF_SCAN,
     DEFAULT_PORT,
     DEFAULT_REGION,
+    DEFAULT_SCAN,
+    DEFAULT_STREAM,
+    DEFAULT_USERNAME,
     DOMAIN,
     MODE_CLOUD,
     UPDATE_INTERVAL_SEC,
@@ -29,6 +38,24 @@ _LOGGER = logging.getLogger(__name__)
 
 def _merged(entry: ConfigEntry) -> dict:
     return {**entry.data, **entry.options}
+
+
+def _relay_config(data: dict) -> dict:
+    """Options-attached relay camera config, or {} when not configured."""
+    uid = (data.get(CONF_RELAY_UID) or "").strip() if isinstance(data.get(CONF_RELAY_UID), str) else ""
+    pwd = data.get(CONF_RELAY_PASSWORD) or ""
+    relay = data.get(CONF_RELAY, "") or ""
+    if uid and pwd and ":" in str(relay):
+        from .const import CONF_STREAM, CONF_UID, CONF_USERNAME
+        return {
+            CONF_UID: uid,
+            CONF_USERNAME: data.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME),
+            CONF_PASSWORD: pwd,
+            CONF_RELAY: str(relay).strip(),
+            CONF_STREAM: int(data.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
+            CONF_SCAN: int(data.get(CONF_SCAN, DEFAULT_SCAN)),
+        }
+    return {}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -59,10 +86,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "entry_kind": MODE_CLOUD,
             CONF_HOST: data.get(CONF_HOST, ""),
             CONF_PORT: int(data.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT),
+            "relay": _relay_config(data),
         }
         await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "image"])
-        if data.get(CONF_HOST):
-            # optional live video via Add-on MJPEG, configured in options
+        if data.get(CONF_HOST) or _relay_config(data):
+            # optional cameras attached later via Configure
             await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
     else:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
@@ -80,7 +108,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if isinstance(hass.data.get(DOMAIN, {}).get(entry.entry_id), dict) and (
             data.get("entry_kind") == MODE_CLOUD or CONF_ACCOUNT in data):
         platforms = ["sensor", "image"]
-        if data.get(CONF_HOST):
+        if data.get(CONF_HOST) or _relay_config(data):
             platforms.append("camera")
     else:
         platforms = ["camera"]

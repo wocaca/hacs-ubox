@@ -1,14 +1,16 @@
-# hacs-ubox — UBox Camera + Sensors HACS Integration
+# hacs-ubox — UBox HACS Integration（云账号入口）
+
+添加时只输云账号密码；摄像头事后在条目"配置"里加。
 
 `拉流_中继.py`（本地 P2P）+ 云端设备页（`脚本/云端/服务器.py`），做成 HACS 可安装的 Integration（`custom_components/ubox`）。
 
-## 三种条目（一个集成，三种加法）
+## 三种用法（一个云条目，全在"配置"里加）
 
-| 模式 | 数据源 | 实体 | 说明 |
+| 部位 | 数据源 | 实体 | 说明 |
 |---|---|---|---|
-| **proxy（推荐）** | `hass-ubox` Add-on `:8089/video.mjpg` + `/snap.jpg` | camera | 1080p 实时，今日可用 |
-| **relay（实验性）** | 内嵌 `p2p/`（`拉流_中继.py` 自包含移植） | camera | 纯 Python、无依赖；天花板 360p IDR 首片快照（缺 0x1403 视频 ACK，见 ubox 交接 #106） |
-| **cloud** | UBox 账号（portal.ubianet.com，us/cn/uni 自动选） | sensor + image（+可选 camera） | 添加时只登录+拉设备列表；实时视频事后在条目"配置"里填 Add-on 地址即出 camera 实体。每设备 ×4 传感器 + ×1 最新云录像快照图；全局 ×1 用户信息。60s 轮询 |
+| 添加时 | UBox 账号（portal.ubianet.com，us/cn/uni 自动选） | sensor + image | 只登录+拉设备列表。每设备 ×4 传感器 + ×1 最新云录像快照图；全局 ×1 用户信息。60s 轮询 |
+| 配置→实时视频 | `hass-ubox` Add-on `:8089/video.mjpg` + `/snap.jpg` | camera | 填 Add-on 主机即出 1080p 实时实体 |
+| 配置→中继摄像头 | 内嵌 `p2p/`（`拉流_中继.py` 自包含移植） | camera | 填 UID/设备密码/中继即出 360p 快照实体（缺 0x1403 视频 ACK，见 ubox 交接 #106） |
 
 **relay 天花板（实测结论，不是 bug）：** 纯 Python 中继只能拿到 360p SUB 的 IDR 首片（含 VPS/SPS/PPS，
 约 1264B），连续 GOP 需要 0x1403 视频 ACK（未实现），1080p MAIN 仍走真 so。要 1080p 请用 proxy 模式。
@@ -20,18 +22,16 @@
 
 1. HACS → 右上 ⋮ → 自定义仓库 → 加 `https://github.com/wocaca/hacs-ubox`，类型 **Integration** → 添加。
 2. 搜 **UBox** → 下载 → 重启 HASS。
-3. 设置 → 设备与服务 → 添加集成 → **UBox**，选一种：
-   - proxy：填 Add-on 主机（一般就是 HASS 本机 IP）+ 端口（默认 8089）。
-   - relay：填摄像头 UID / admin / 密码 / 中继 `162.251.63.134:20001` / stream=0 / 轮询>=10s。
-   - cloud：填 UBox 账号 + 密码 + 区服（默认 us，登录时按设备列表非空自动纠偏）。加完只有传感器/图片；要实时视频去该条目点"配置"，填 Add-on 主机+端口，自动多出 camera 实体（与单独加 proxy 二选一，同地址会冲突只留一个）。
+3. 设置 → 设备与服务 → 添加集成 → **UBox**：只填 UBox 账号 + 密码 + 区服（默认 us，登录时按设备列表非空自动纠偏），即出传感器/图片。
+4. 要摄像头：去该条目点"配置"——实时视频填 Add-on 主机+端口；中继摄像头填 UID/设备密码/中继。留空=不要，可随时改。
 
 ## 文件结构
 
 ```
 custom_components/ubox/
-  manifest.json  domain=ubox, local_polling, 0.2.0
-  __init__.py    camera 条目 vs cloud 条目分流（sensor 60s Coordinator）
-  config_flow.py proxy / relay / cloud 三步表单
+  manifest.json  domain=ubox, local_polling, 0.5.0
+  __init__.py    cloud 条目：sensor+image 60s Coordinator，配置里加了地址/中继才转发 camera
+  config_flow.py 添加=云登录；配置=实时视频+中继摄像头（旧 proxy/relay 独立条目仍兼容）
   camera.py      UboxProxyCamera + UboxRelayCamera
   sensor.py      每设备4传感器 + 用户传感器（device_pwd 不进属性）
   image.py       每设备最新一条云录像一张图（img_url 直取，属性带回放参数）
