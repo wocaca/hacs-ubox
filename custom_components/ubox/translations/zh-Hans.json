@@ -14,9 +14,11 @@
     "step": {
       "init": {
         "title": "UBox 设备列表",
-        "description": "点一台进去配它的实时/中继。",
+        "description": "点一台进去配它的实时/中继。Add-on 鉴权（与 Add-on 配置页的 http_username/http_password 一致）填这里，全局有效。",
         "data": {
-          "device": "设备"
+          "device": "设备",
+          "http_username": "Add-on 用户名（空=无鉴权）",
+          "http_password": "Add-on 密码"
         }
       },
       "device": {

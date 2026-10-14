@@ -11,12 +11,13 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .cloud_api import UboxApi
 from .const import (
-    CONF_ACCOUNT, CONF_DEVICE, CONF_DEVICES, CONF_HOST, CONF_LIVE, CONF_PASSWORD,
+    CONF_ACCOUNT, CONF_DEVICE, CONF_DEVICES, CONF_HOST, CONF_HTTP_PASS, CONF_HTTP_USER,
+    CONF_LIVE, CONF_PASSWORD,
     CONF_PORT, CONF_REGION, CONF_RELAY, CONF_RELAY_PASSWORD, CONF_RELAY_STREAM,
     CONF_RELAY_UID, CONF_RELAY_USERNAME, CONF_SCAN, CONF_STREAM, CONF_UID,
-    CONF_USERNAME, DEFAULT_PORT, DEFAULT_REGION, DEFAULT_RELAY, DEFAULT_SCAN,
-    DEFAULT_STREAM, DEFAULT_USERNAME, DOMAIN, MODE_CLOUD, MODE_PROXY, MODE_RELAY,
-    REGIONS,
+    CONF_USERNAME, DEFAULT_PORT,
+    DEFAULT_REGION, DEFAULT_RELAY, DEFAULT_SCAN, DEFAULT_STREAM,
+    DEFAULT_USERNAME, DOMAIN, MODE_CLOUD, MODE_PROXY, MODE_RELAY, REGIONS,
 )
 
 
@@ -81,6 +82,8 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry) -> None:
         self._entry = entry
         self._device_uid: str = ""
+        self._http_user: str = ""
+        self._http_pass: str = ""
 
     def _devices(self) -> list:
         try:
@@ -101,25 +104,44 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
         return merged.get(CONF_DEVICES, {}) or {}
 
     async def async_step_init(self, user_input=None) -> FlowResult:
+        merged = {**self._entry.data, **self._entry.options}
         if self._entry.data.get("entry_kind", MODE_CLOUD) != MODE_CLOUD:
-            return self.async_abort(reason="camera_no_options")
+            # 旧独立 proxy 条目：只需要补 Add-on 鉴权
+            if user_input is not None:
+                opts = dict(self._entry.options)
+                opts[CONF_HTTP_USER] = (user_input.get(CONF_HTTP_USER) or "").strip()
+                opts[CONF_HTTP_PASS] = user_input.get(CONF_HTTP_PASS) or ""
+                return self.async_create_entry(title="", data=opts)
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({
+                    vol.Optional(CONF_HTTP_USER, default=merged.get(CONF_HTTP_USER, "")): str,
+                    vol.Optional(CONF_HTTP_PASS, default=merged.get(CONF_HTTP_PASS, "")): str,
+                }),
+            )
         devs = {d.get("uid", ""): f"{d.get('name') or d.get('uid', '')}"
                 for d in self._devices() if d.get("uid")}
         if not devs:
             return self.async_abort(reason="no_devices")
-        if len(devs) == 1 and user_input is None:
-            self._device_uid = next(iter(devs))
-            return await self.async_step_device()
         if user_input is not None:
-            self._device_uid = user_input.get(CONF_DEVICE) or ""
+            self._device_uid = user_input.get(CONF_DEVICE) or next(iter(devs))
+            self._http_user = (user_input.get(CONF_HTTP_USER) or "").strip()
+            self._http_pass = user_input.get(CONF_HTTP_PASS) or ""
             if self._device_uid:
                 return await self.async_step_device()
+        if len(devs) == 1 and user_input is None:
+            self._device_uid = next(iter(devs))
+            self._http_user = merged.get(CONF_HTTP_USER, "")
+            self._http_pass = merged.get(CONF_HTTP_PASS, "")
+            return await self.async_step_device()
         saved_uids = set(self._saved())
         default = next((u for u in devs if u in saved_uids), next(iter(devs)))
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
                 vol.Required(CONF_DEVICE, default=default): vol.In(devs),
+                vol.Optional(CONF_HTTP_USER, default=merged.get(CONF_HTTP_USER, "")): str,
+                vol.Optional(CONF_HTTP_PASS, default=merged.get(CONF_HTTP_PASS, "")): str,
             }),
         )
 
@@ -141,8 +163,11 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
                 CONF_RELAY_STREAM: int(user_input.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
                 CONF_SCAN: int(user_input.get(CONF_SCAN, DEFAULT_SCAN)),
             }
-            # 空配置回退：实时关且中继三件套不全 = 该设备不配任何摄像头
-            return self.async_create_entry(title="", data={CONF_DEVICES: all_cfg})
+            opts = dict(self._entry.options)
+            opts[CONF_DEVICES] = all_cfg
+            opts[CONF_HTTP_USER] = self._http_user
+            opts[CONF_HTTP_PASS] = self._http_pass
+            return self.async_create_entry(title="", data=opts)
         auto_user = dev.get("device_user") or DEFAULT_USERNAME
         auto_pwd = dev.get("device_pwd") or ""
         online = "在线" if dev.get("online") else "离线"

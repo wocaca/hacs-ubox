@@ -23,7 +23,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    CONF_HOST, CONF_MODE, CONF_PASSWORD, CONF_PORT, CONF_RELAY, CONF_SCAN,
+    CONF_HOST, CONF_HTTP_PASS, CONF_HTTP_USER, CONF_MODE, CONF_PASSWORD, CONF_PORT, CONF_RELAY, CONF_SCAN,
     CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_SCAN, DOMAIN, MODE_CLOUD,
     MODE_PROXY,
 )
@@ -56,7 +56,9 @@ async def async_setup_entry(
         ents = []
         for uid, port in (store.get("live", {}) or {}).items():
             ents.append(UboxProxyCamera(
-                hass, entry, {CONF_HOST: host, CONF_PORT: port},
+                hass, entry, {CONF_HOST: host, CONF_PORT: port,
+                              CONF_HTTP_USER: store.get(CONF_HTTP_USER, ""),
+                              CONF_HTTP_PASS: store.get(CONF_HTTP_PASS, "")},
                 name=f"UBox {names.get(uid, uid)} 实时",
                 unique_id=f"ubox-{uid}-live",
                 device=devs.get(uid)))
@@ -83,8 +85,15 @@ class UboxProxyCamera(Camera):
         self._entry = entry
         host = data[CONF_HOST]
         port = int(data.get(CONF_PORT, 8089))
-        self._mjpeg = f"http://{host}:{port}/video.mjpg"
-        self._snap = f"http://{host}:{port}/snap.jpg"
+        self._http_user = data.get(CONF_HTTP_USER) or ""
+        self._http_pass = data.get(CONF_HTTP_PASS) or ""
+        if self._http_user and self._http_pass:
+            from urllib.parse import quote as _q
+            ui = f"{_q(self._http_user, safe='')}:{_q(self._http_pass, safe='')}@"
+        else:
+            ui = ""
+        self._mjpeg = f"http://{ui}{host}:{port}/video.mjpg"
+        self._snap = f"http://{ui}{host}:{port}/snap.jpg"
         self._attr_name = name or f"UBox {host}"
         self._attr_unique_id = unique_id or f"ubox-proxy-{host}-{port}"
         if device:
@@ -102,8 +111,10 @@ class UboxProxyCamera(Camera):
 
     async def async_camera_image(self, width=None, height=None) -> bytes | None:
         session = async_get_clientsession(self.hass)
+        auth = aiohttp.BasicAuth(self._http_user, self._http_pass) if self._http_pass else None
         try:
-            async with session.get(self._snap, timeout=aiohttp.ClientTimeout(total=10)) as r:
+            async with session.get(self._snap, auth=auth,
+                                   timeout=aiohttp.ClientTimeout(total=10)) as r:
                 if r.status != 200:
                     return None
                 return await r.read()

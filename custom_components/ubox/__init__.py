@@ -13,6 +13,8 @@ from .const import (
     CONF_ACCOUNT,
     CONF_DEVICES,
     CONF_HOST,
+    CONF_HTTP_PASS,
+    CONF_HTTP_USER,
     CONF_LIVE,
     CONF_PASSWORD,
     CONF_PORT,
@@ -125,6 +127,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "addon_host": host,
             "live": live,
             "relay_cfgs": relay_cfgs,
+            CONF_HTTP_USER: data.get(CONF_HTTP_USER, "") or "",
+            CONF_HTTP_PASS: data.get(CONF_HTTP_PASS, "") or "",
             "platforms": ["sensor", "image"] + (["camera"] if (live or relay_cfgs) else []),
         }
         store = hass.data[DOMAIN][entry.entry_id]

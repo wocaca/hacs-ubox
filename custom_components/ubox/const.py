@@ -23,6 +23,10 @@ DEFAULT_STREAM = 0
 DEFAULT_SCAN = 30
 DEFAULT_USERNAME = "admin"
 
+# ---- Add-on HTTP auth (8089 Basic, empty = open) ----
+CONF_HTTP_USER = "http_username"
+CONF_HTTP_PASS = "http_password"
+
 # ---- options: per-device config ----
 CONF_DEVICE = "device"
 CONF_DEVICES = "devices"
