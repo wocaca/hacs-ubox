@@ -170,4 +170,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add: 
             UboxCloudSensor(coordinator, dev),
         ]
     ents.append(UboxUserSensor(coordinator, entry.data.get("account", "")))
-    async_add(entities=ents)
+    async_add(ents)
