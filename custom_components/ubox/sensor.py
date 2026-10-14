@@ -1,6 +1,6 @@
-"""UBox sensors only：每设备 在线/电量/信号/最后活跃/近7天云录像数 + 单个用户传感器.
+"""UBox sensors：每设备 在线/电量/信号/最后活跃 + 单个用户传感器.
 
-对齐 8080 设备页（含云录像计数）+ 用户页（资料+设备统计）。
+云录像不做 sensor（改走 image 平台：一录像一张图）。
 device_pwd 明文、avatar 签名 URL、Token 一律不进 attributes。
 """
 from __future__ import annotations
@@ -101,31 +101,6 @@ class UboxLastActiveSensor(_Base):
         return None
 
 
-class UboxCloudSensor(_Base):
-    """近7天云录像条数（云录像入口保留的最小形态），最新一条只留 guid/时间。"""
-
-    def __init__(self, coordinator, dev: dict) -> None:
-        super().__init__(coordinator, dev, "cloud7d", "近7天云录像")
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-    @property
-    def native_value(self):
-        c = (self.coordinator.data.get("cloud", {}) or {}).get(self._uid, {})
-        return c.get("count")
-
-    @property
-    def extra_state_attributes(self):
-        c = (self.coordinator.data.get("cloud", {}) or {}).get(self._uid, {})
-        latest = c.get("latest", {}) or {}
-        keep = {k: latest.get(k) for k in ("guid", "itemid", "begin", "end", "uid") if latest.get(k) is not None}
-        d = self._dev()
-        return {
-            "has_cloud_storage": d.get("has_cloud_storage"),
-            "cloud_opened": d.get("cloud_opened"),
-            "latest": keep,
-        }
-
-
 class UboxUserSensor(CoordinatorEntity, SensorEntity):
     """单个用户传感器：值为设备总数，属性带用户资料安全子集 + 设备统计。"""
 
@@ -167,7 +142,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add: 
             UboxBatterySensor(coordinator, dev),
             UboxSignalSensor(coordinator, dev),
             UboxLastActiveSensor(coordinator, dev),
-            UboxCloudSensor(coordinator, dev),
         ]
     ents.append(UboxUserSensor(coordinator, entry.data.get("account", "")))
     async_add(ents)

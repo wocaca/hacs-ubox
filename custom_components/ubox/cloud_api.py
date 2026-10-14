@@ -8,7 +8,7 @@ import time
 
 import aiohttp
 
-from .const import CLOUD_LIST_DAYS, REGIONS
+from .const import CLOUD_LIST_DAYS, MAX_CLOUD_IMAGES, REGIONS
 
 
 def app_password(pwd: str) -> str:
@@ -169,7 +169,8 @@ class UboxApi:
                 )
                 items = ((lst.get("data") or {}).get("items", []) or [])
                 latest = items[0] if items else {}
-                cloud[uid] = {"count": len(items), "latest": latest}
+                cloud[uid] = {"count": len(items), "latest": latest,
+                              "items": [i for i in items[:MAX_CLOUD_IMAGES] if isinstance(i, dict)]}
             except Exception:  # noqa: BLE001
                 cloud[uid] = {"count": None, "latest": {}}
         total = len(devices)

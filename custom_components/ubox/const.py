@@ -1,6 +1,6 @@
 """UBox integration constants: local camera (proxy/relay) + cloud sensors."""
 DOMAIN = "ubox"
-PLATFORMS = ["camera", "sensor"]
+PLATFORMS = ["camera", "sensor", "image"]
 
 # ---- local camera (proxy / relay) ----
 CONF_MODE = "mode"
@@ -35,3 +35,4 @@ REGIONS = {
 DEFAULT_REGION = "us"
 UPDATE_INTERVAL_SEC = 60
 CLOUD_LIST_DAYS = 7
+MAX_CLOUD_IMAGES = 5

@@ -51,7 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "coordinator": coordinator,
             "entry_kind": MODE_CLOUD,
         }
-        await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+        await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "image"])
     else:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
         await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
@@ -66,7 +66,7 @@ async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
     if isinstance(data, dict) and data.get("entry_kind") == MODE_CLOUD:
-        platforms = ["sensor"]
+        platforms = ["sensor", "image"]
     else:
         platforms = ["camera"]
     ok = await hass.config_entries.async_unload_platforms(entry, platforms)
