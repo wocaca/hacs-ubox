@@ -2,17 +2,17 @@
   "flow": {
     "user": {
       "title": "UBox",
-      "description": "代理 = Add-on MJPEG（1080p，推荐）。直连 = 纯 Python 中继（快照，实验性）。"
+      "description": "代理 = Add-on MJPEG 摄像头。直连 = 纯 Python P2P 摄像头。云端 = 账号设备/用户传感器。"
     },
     "proxy": {
-      "title": "UBox 代理",
+      "title": "UBox 代理摄像头",
       "data": {
         "host": "Add-on 主机（HASS IP）",
         "port": "Add-on 端口"
       }
     },
     "relay": {
-      "title": "UBox 中继（实验性）",
+      "title": "UBox 中继摄像头（实验性）",
       "data": {
         "uid": "摄像头 UID",
         "username": "设备账号（admin）",
@@ -22,10 +22,20 @@
         "scan_interval": "轮询间隔秒（>=10）"
       },
       "description": "实验性：仅 360p IDR 快照。要 1080p 实时请用代理模式。"
+    },
+    "cloud": {
+      "title": "UBox 云端传感器",
+      "data": {
+        "account": "UBox 账号（手机/邮箱）",
+        "password": "账号密码",
+        "region": "区服"
+      }
     }
   },
   "error": {
     "required": "此项必填。",
-    "invalid": "值无效。"
+    "invalid": "值无效。",
+    "missing_account": "账号和密码必填。",
+    "cannot_connect": "登录失败，检查账号/密码/区服。"
   }
 }

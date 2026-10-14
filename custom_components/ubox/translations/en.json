@@ -2,17 +2,17 @@
   "flow": {
     "user": {
       "title": "UBox",
-      "description": "Proxy = Add-on MJPEG (1080p, recommended). Relay = pure Python (snapshot, experimental)."
+      "description": "Proxy = Add-on MJPEG camera. Relay = pure-Python P2P camera. Cloud = account device/user sensors."
     },
     "proxy": {
-      "title": "UBox proxy",
+      "title": "UBox proxy camera",
       "data": {
         "host": "Add-on host (HASS IP)",
         "port": "Add-on port"
       }
     },
     "relay": {
-      "title": "UBox relay (experimental)",
+      "title": "UBox relay camera (experimental)",
       "data": {
         "uid": "Camera UID",
         "username": "Device login (admin)",
@@ -22,10 +22,20 @@
         "scan_interval": "Poll interval seconds (>=10)"
       },
       "description": "Experimental: 360p IDR snapshot only. 1080p live needs proxy mode."
+    },
+    "cloud": {
+      "title": "UBox cloud sensors",
+      "data": {
+        "account": "UBox account (phone/email)",
+        "password": "Account password",
+        "region": "Portal region"
+      }
     }
   },
   "error": {
     "required": "This field is required.",
-    "invalid": "Invalid value."
+    "invalid": "Invalid value.",
+    "missing_account": "Account and password are required.",
+    "cannot_connect": "Login failed, check account/password/region."
   }
 }

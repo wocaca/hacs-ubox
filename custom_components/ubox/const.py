@@ -1,5 +1,8 @@
-"""UBox integration constants."""
+"""UBox integration constants: local camera (proxy/relay) + cloud sensors."""
 DOMAIN = "ubox"
+PLATFORMS = ["camera", "sensor"]
+
+# ---- local camera (proxy / relay) ----
 CONF_MODE = "mode"
 CONF_HOST = "host"
 CONF_PORT = "port"
@@ -12,9 +15,23 @@ CONF_SCAN = "scan_interval"
 
 MODE_PROXY = "proxy"
 MODE_RELAY = "relay"
+MODE_CLOUD = "cloud"
 
 DEFAULT_PORT = 8089
 DEFAULT_RELAY = "162.251.63.134:20001"
 DEFAULT_STREAM = 0
 DEFAULT_SCAN = 30
 DEFAULT_USERNAME = "admin"
+
+# ---- cloud sensors (UBox account, portal.ubianet.com) ----
+CONF_ACCOUNT = "account"
+CONF_REGION = "region"
+
+REGIONS = {
+    "cn": "https://portal-cn.ubianet.com",
+    "us": "https://portal-us.ubianet.com",
+    "uni": "https://portal-uni.ubianet.com",
+}
+DEFAULT_REGION = "us"
+UPDATE_INTERVAL_SEC = 60
+CLOUD_LIST_DAYS = 7

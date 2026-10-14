@@ -1,15 +1,16 @@
-"""UBox config flow: proxy (Add-on MJPEG, recommended) or relay (pure-Python, experimental)."""
+"""UBox config flow: proxy camera / relay camera / cloud sensors."""
 from __future__ import annotations
 
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 
+from .cloud_api import UboxApi
 from .const import (
-    CONF_HOST, CONF_MODE, CONF_PASSWORD, CONF_PORT, CONF_RELAY, CONF_SCAN,
-    CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_PORT, DEFAULT_RELAY,
-    DEFAULT_SCAN, DEFAULT_STREAM, DEFAULT_USERNAME, DOMAIN, MODE_PROXY,
-    MODE_RELAY,
+    CONF_ACCOUNT, CONF_HOST, CONF_MODE, CONF_PASSWORD, CONF_PORT, CONF_REGION,
+    CONF_RELAY, CONF_SCAN, CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_PORT,
+    DEFAULT_REGION, DEFAULT_RELAY, DEFAULT_SCAN, DEFAULT_STREAM,
+    DEFAULT_USERNAME, DOMAIN, MODE_CLOUD, MODE_PROXY, MODE_RELAY, REGIONS,
 )
 
 
@@ -22,15 +23,18 @@ class UboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=vol.Schema({
                     vol.Required(CONF_MODE, default=MODE_PROXY): vol.In({
-                        MODE_PROXY: "Proxy (UBox Camera Add-on MJPEG, 1080p)",
-                        MODE_RELAY: "Relay direct (pure Python, 360p snapshot, experimental)",
+                        MODE_PROXY: "Proxy camera (Add-on MJPEG, 1080p)",
+                        MODE_RELAY: "Relay camera (pure Python, snapshot, experimental)",
+                        MODE_CLOUD: "Cloud sensors (account devices + user)",
                     }),
                 }),
             )
-        self._mode = user_input[CONF_MODE]
-        if self._mode == MODE_PROXY:
+        mode = user_input[CONF_MODE]
+        if mode == MODE_PROXY:
             return await self.async_step_proxy()
-        return await self.async_step_relay()
+        if mode == MODE_RELAY:
+            return await self.async_step_relay()
+        return await self.async_step_cloud()
 
     async def async_step_proxy(self, user_input=None) -> FlowResult:
         errors: dict = {}
@@ -95,4 +99,40 @@ class UboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "note": "Experimental: 360p IDR snapshot only. 1080p live needs proxy mode."
             },
+        )
+
+    async def async_step_cloud(self, user_input=None) -> FlowResult:
+        errors: dict = {}
+        if user_input is not None:
+            account = (user_input.get(CONF_ACCOUNT) or "").strip()
+            password = user_input.get(CONF_PASSWORD) or ""
+            region = user_input.get(CONF_REGION, DEFAULT_REGION)
+            if not account or not password:
+                errors["base"] = "missing_account"
+            else:
+                try:
+                    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+                    api = UboxApi(async_get_clientsession(self.hass), account, password, region)
+                    ok, real_region = await api.login()
+                    if not ok:
+                        errors["base"] = "cannot_connect"
+                    else:
+                        await self.async_set_unique_id(f"{DOMAIN}:{account}:{real_region}")
+                        self._abort_if_unique_id_configured()
+                        return self.async_create_entry(
+                            title=f"UBox {account} ({real_region})",
+                            data={CONF_ACCOUNT: account, CONF_PASSWORD: password,
+                                  CONF_REGION: real_region, "entry_kind": MODE_CLOUD},
+                        )
+                except Exception:  # noqa: BLE001 - login network errors are user-facing
+                    errors["base"] = "cannot_connect"
+        return self.async_show_form(
+            step_id="cloud",
+            data_schema=vol.Schema({
+                vol.Required(CONF_ACCOUNT): str,
+                vol.Required(CONF_PASSWORD): str,
+                vol.Optional(CONF_REGION, default=DEFAULT_REGION): vol.In(list(REGIONS)),
+            }),
+            errors=errors,
         )
