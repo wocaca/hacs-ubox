@@ -92,8 +92,10 @@ class UboxProxyCamera(Camera):
             ui = f"{_q(self._http_user, safe='')}:{_q(self._http_pass, safe='')}@"
         else:
             ui = ""
+        # stream_source 给 HA 拉流 worker 用，凭证只能嵌 URL 里；
+        # 快照走自家 aiohttp（auth 参数），URL 必须干净，否则 aiohttp 报凭证冲突。
         self._mjpeg = f"http://{ui}{host}:{port}/video.mjpg"
-        self._snap = f"http://{ui}{host}:{port}/snap.jpg"
+        self._snap = f"http://{host}:{port}/snap.jpg"
         self._attr_name = name or f"UBox {host}"
         self._attr_unique_id = unique_id or f"ubox-proxy-{host}-{port}"
         if device:
