@@ -16,6 +16,7 @@ import time
 
 import aiohttp
 from homeassistant.components.camera import Camera, CameraEntityFeature
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,6 +31,17 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _dev_info(dev: dict) -> DeviceInfo:
+    """与 sensor/image 同一 device：identifiers (ubox, uid)，三者挂同一设备页。"""
+    return DeviceInfo(
+        identifiers={(DOMAIN, dev["uid"])},
+        name=f"UBox {dev.get('name') or dev['uid']}",
+        manufacturer="Ubia",
+        model=f"{dev.get('model', '')} / {dev.get('firmware', '')}".strip(" /"),
+        serial_number=dev["uid"],
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -38,18 +50,21 @@ async def async_setup_entry(
         # cloud entry: per-device cameras from Configure (device list)
         store = data
         host = store.get("addon_host", "")
-        names = {d.get("uid"): (d.get("name") or d.get("uid"))
-                 for d in ((store.get("coordinator").data or {}).get("devices", []) or [])}
+        devs = {d.get("uid"): d for d in
+                ((store.get("coordinator").data or {}).get("devices", []) or []) if d.get("uid")}
+        names = {u: (d.get("name") or u) for u, d in devs.items()}
         ents = []
         for uid, port in (store.get("live", {}) or {}).items():
             ents.append(UboxProxyCamera(
                 hass, entry, {CONF_HOST: host, CONF_PORT: port},
                 name=f"UBox {names.get(uid, uid)} 实时",
-                unique_id=f"ubox-{uid}-live"))
+                unique_id=f"ubox-{uid}-live",
+                device=devs.get(uid)))
         for uid, rcfg in (store.get("relay_cfgs", {}) or {}).items():
             ents.append(UboxRelayCamera(
                 hass, entry, dict(rcfg),
-                name=f"UBox {names.get(uid, uid)} 中继"))
+                name=f"UBox {names.get(uid, uid)} 中继",
+                device=devs.get(uid)))
         if ents:
             async_add_entities(ents)
         return
@@ -62,7 +77,7 @@ async def async_setup_entry(
 class UboxProxyCamera(Camera):
     """Proxy the Add-on MJPEG server as a proper HA camera."""
 
-    def __init__(self, hass, entry, data, name=None, unique_id=None):
+    def __init__(self, hass, entry, data, name=None, unique_id=None, device=None):
         super().__init__()
         self.hass = hass
         self._entry = entry
@@ -72,6 +87,8 @@ class UboxProxyCamera(Camera):
         self._snap = f"http://{host}:{port}/snap.jpg"
         self._attr_name = name or f"UBox {host}"
         self._attr_unique_id = unique_id or f"ubox-proxy-{host}-{port}"
+        if device:
+            self._attr_device_info = _dev_info(device)
         # 必须是 Flag 类型：新 HA 在 added_to_hass 里做 `STREAM not in supported_features`，
         # 纯 int 0 会 TypeError 导致实体加不进来（中继实体没设此项所以一直正常）。
         self._attr_supported_features = CameraEntityFeature(0)
@@ -120,11 +137,13 @@ def _decode_h265_to_jpeg(h265: bytes, timeout=20) -> bytes | None:
 class UboxRelayCamera(Camera):
     """Experimental pure-Python relay snapshot camera (360p IDR fragment)."""
 
-    def __init__(self, hass, entry, data, name=None):
+    def __init__(self, hass, entry, data, name=None, device=None):
         super().__init__()
         self.hass = hass
         self._data = dict(data)
         self._attr_name = name or f"UBox relay {data.get(CONF_UID, '')[:6]}.."
+        if device:
+            self._attr_device_info = _dev_info(device)
         self._attr_unique_id = f"ubox-relay-{data.get(CONF_UID)}-{data.get(CONF_RELAY)}"
         self._jpeg: bytes | None = None
         self._last_ok: float | None = None
