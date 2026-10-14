@@ -13,17 +13,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "UBox 摄像头",
-        "description": "实时视频填 Add-on 主机；中继摄像头填 UID/密码/中继。全留空=都不要。",
+        "title": "UBox 选设备",
+        "description": "多设备时先选一台；UID/设备密码下一步自动带出。实时视频填 Add-on 主机（空=不要）。",
         "data": {
+          "device": "设备（UID 下一步自动带出）",
           "host": "Add-on 主机（HASS IP，空=不要实时）",
-          "port": "Add-on 端口",
-          "relay_uid": "中继摄像头 UID（空=不要中继）",
+          "port": "Add-on 端口"
+        }
+      },
+      "cameras": {
+        "title": "UBox 摄像头",
+        "description": "UID/设备密码已从 {dev} 自动带出，可改。全留空=不要中继摄像头。",
+        "data": {
+          "relay_uid": "摄像头 UID（已自动带出）",
           "relay_username": "设备账号",
-          "relay_password": "设备密码",
+          "relay_password": "设备密码（已自动带出）",
           "relay": "中继 host:port",
           "relay_stream": "码流类型（0 = 子码流）",
-          "scan_interval": "中继轮询间隔秒（>=10）"
+          "scan_interval": "轮询间隔秒（>=10）"
         }
       }
     }

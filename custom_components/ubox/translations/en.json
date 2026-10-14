@@ -13,25 +13,32 @@
   "options": {
     "step": {
       "init": {
-        "title": "UBox 摄像头",
-        "description": "实时视频填 Add-on 主机；中继摄像头填 UID/密码/中继。全留空=都不要。",
+        "title": "UBox 选设备",
+        "description": "多设备时先选一台；UID/设备密码下一步自动带出。实时视频填 Add-on 主机（空=不要）。",
         "data": {
-          "host": "Add-on 主机（HASS IP，空=不要实时）",
-          "port": "Add-on 端口",
-          "relay_uid": "中继摄像头 UID（空=不要中继）",
-          "relay_username": "设备账号",
-          "relay_password": "设备密码",
-          "relay": "中继 host:port",
-          "relay_stream": "码流类型（0 = 子码流）",
-          "scan_interval": "中继轮询间隔秒（>=10）"
+          "device": "Device (UID auto-filled next step)",
+          "host": "Add-on host (HASS IP, empty = none)",
+          "port": "Add-on port"
+        }
+      },
+      "cameras": {
+        "title": "UBox 摄像头",
+        "description": "UID/设备密码已从 {dev} 自动带出，可改。全留空=不要中继摄像头。",
+        "data": {
+          "relay_uid": "Camera UID (auto-filled)",
+          "relay_username": "Device login",
+          "relay_password": "Device password (auto-filled)",
+          "relay": "Relay host:port",
+          "relay_stream": "Stream type (0 = SUB)",
+          "scan_interval": "Poll interval seconds (>=10)"
         }
       }
     }
   },
   "config": {
     "abort": {
-      "camera_no_options": "摄像头条目没有额外选项。",
-      "use_cloud_first": "请先添加 UBox 云账号，摄像头在条目“配置”里加。"
+      "camera_no_options": "Camera entries have no extra options.",
+      "use_cloud_first": "Add the UBox cloud account first; cameras attach in Configure."
     }
   },
   "error": {

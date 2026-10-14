@@ -136,6 +136,9 @@ class UboxApi:
                     "is_owner": it.get("is_owner", inf.get("is_owner", False)),
                     "device_user": inf.get("device_user", ""),
                     "has_pwd": bool(inf.get("device_pwd")),
+                    # device_pwd 明文只留内存供配置页自动带出，绝不进 attributes
+                    # （sensor/image 的属性白名单里没有它，见 sensor.py/image.py）
+                    "device_pwd": inf.get("device_pwd") or "",
                     # device_pwd 明文绝不进 attributes（对齐服务器.py 掩码策略）
                     "raw_item": it,
                     "raw_info": {k: v for k, v in inf.items() if k != "device_pwd"},
