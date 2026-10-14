@@ -119,7 +119,7 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(CONF_HTTP_PASS, default=merged.get(CONF_HTTP_PASS, "")): str,
                 }),
             )
-        devs = {d.get("uid", ""): f"{d.get('name') or d.get('uid', '')}"
+        devs = {d.get("uid", ""): f"{d.get('name') or d.get('uid', '')}（{'在线' if d.get('online') else '离线'}）"
                 for d in self._devices() if d.get("uid")}
         if not devs:
             return self.async_abort(reason="no_devices")
@@ -129,17 +129,17 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
             self._http_pass = user_input.get(CONF_HTTP_PASS) or ""
             if self._device_uid:
                 return await self.async_step_device()
-        # 单设备也不自动跳过：http 鉴权两格必须有机会填
+        # 即使只有一台也显示设备列表，点进去再配下一页
         saved_uids = set(self._saved())
         default = next((u for u in devs if u in saved_uids), next(iter(devs)))
-        schema: dict = {}
-        if len(devs) > 1:
-            schema[vol.Required(CONF_DEVICE, default=default)] = vol.In(devs)
-        else:
-            self._device_uid = next(iter(devs))
-        schema[vol.Optional(CONF_HTTP_USER, default=merged.get(CONF_HTTP_USER, ""))] = str
-        schema[vol.Optional(CONF_HTTP_PASS, default=merged.get(CONF_HTTP_PASS, ""))] = str
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Required(CONF_DEVICE, default=default): vol.In(devs),
+                vol.Optional(CONF_HTTP_USER, default=merged.get(CONF_HTTP_USER, "")): str,
+                vol.Optional(CONF_HTTP_PASS, default=merged.get(CONF_HTTP_PASS, "")): str,
+            }),
+        )
 
     async def async_step_device(self, user_input=None) -> FlowResult:
         merged = {**self._entry.data, **self._entry.options}
