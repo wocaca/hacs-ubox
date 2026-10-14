@@ -102,6 +102,7 @@ class UboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_cloud(self, user_input=None) -> FlowResult:
+        # 添加时只登录云账号并拉设备列表；实时视频地址事后在“配置”里填。
         errors: dict = {}
         if user_input is not None:
             account = (user_input.get(CONF_ACCOUNT) or "").strip()
@@ -135,4 +136,34 @@ class UboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): vol.In(list(REGIONS)),
             }),
             errors=errors,
+        )
+
+    @staticmethod
+    def async_get_options_flow(entry):
+        return UboxOptionsFlow(entry)
+
+
+class UboxOptionsFlow(config_entries.OptionsFlow):
+    """cloud 条目的事后配置：Add-on 实时视频地址（留空=不要实时实体）。"""
+
+    def __init__(self, entry) -> None:
+        self._entry = entry
+
+    async def async_step_init(self, user_input=None) -> FlowResult:
+        if self._entry.data.get("entry_kind") != MODE_CLOUD:
+            return self.async_abort(reason="camera_no_options")
+        merged = {**self._entry.data, **self._entry.options}
+        if user_input is not None:
+            host = (user_input.get(CONF_HOST) or "").strip()
+            port = int(user_input.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT)
+            return self.async_create_entry(
+                title="",
+                data={CONF_HOST: host, CONF_PORT: port} if host else {},
+            )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_HOST, default=merged.get(CONF_HOST, "")): str,
+                vol.Optional(CONF_PORT, default=merged.get(CONF_PORT, DEFAULT_PORT)): int,
+            }),
         )

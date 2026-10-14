@@ -2,7 +2,7 @@
   "flow": {
     "user": {
       "title": "UBox",
-      "description": "Proxy = Add-on MJPEG camera. Relay = pure-Python P2P camera. Cloud = account device/user sensors."
+      "description": "Proxy = Add-on MJPEG camera. Relay = pure-Python P2P camera. Cloud = account devices, user and snapshots (live video later in Configure)."
     },
     "proxy": {
       "title": "UBox proxy camera",
@@ -24,12 +24,29 @@
       "description": "Experimental: 360p IDR snapshot only. 1080p live needs proxy mode."
     },
     "cloud": {
-      "title": "UBox cloud sensors",
+      "title": "UBox cloud (account login)",
       "data": {
         "account": "UBox account (phone/email)",
         "password": "Account password",
         "region": "Portal region"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UBox live video",
+        "description": "Add-on MJPEG address for the live camera entity. Leave host empty for no live entity.",
+        "data": {
+          "host": "Add-on host (HASS IP, empty = none)",
+          "port": "Add-on port"
+        }
+      }
+    }
+  },
+  "config": {
+    "abort": {
+      "camera_no_options": "Camera entries have no extra options."
     }
   },
   "error": {

@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **proxy（推荐）** | `hass-ubox` Add-on `:8089/video.mjpg` + `/snap.jpg` | camera | 1080p 实时，今日可用 |
 | **relay（实验性）** | 内嵌 `p2p/`（`拉流_中继.py` 自包含移植） | camera | 纯 Python、无依赖；天花板 360p IDR 首片快照（缺 0x1403 视频 ACK，见 ubox 交接 #106） |
-| **cloud（新增）** | UBox 账号（portal.ubianet.com，us/cn/uni 自动选） | sensor + image | 每设备 ×4 传感器：在线状态 / 电量% / 信号 / 最后活跃；每设备 ×1 图片：最新一条云录像缩略图（属性带 guid/时间和回放参数）；全局 ×1 用户信息。60s 轮询，登录即验活 |
+| **cloud** | UBox 账号（portal.ubianet.com，us/cn/uni 自动选） | sensor + image（+可选 camera） | 添加时只登录+拉设备列表；实时视频事后在条目"配置"里填 Add-on 地址即出 camera 实体。每设备 ×4 传感器 + ×1 最新云录像快照图；全局 ×1 用户信息。60s 轮询 |
 
 **relay 天花板（实测结论，不是 bug）：** 纯 Python 中继只能拿到 360p SUB 的 IDR 首片（含 VPS/SPS/PPS，
 约 1264B），连续 GOP 需要 0x1403 视频 ACK（未实现），1080p MAIN 仍走真 so。要 1080p 请用 proxy 模式。
@@ -23,7 +23,7 @@
 3. 设置 → 设备与服务 → 添加集成 → **UBox**，选一种：
    - proxy：填 Add-on 主机（一般就是 HASS 本机 IP）+ 端口（默认 8089）。
    - relay：填摄像头 UID / admin / 密码 / 中继 `162.251.63.134:20001` / stream=0 / 轮询>=10s。
-   - cloud：填 UBox 账号 + 密码 + 区服（默认 us，登录时按设备列表非空自动纠偏）。
+   - cloud：填 UBox 账号 + 密码 + 区服（默认 us，登录时按设备列表非空自动纠偏）。加完只有传感器/图片；要实时视频去该条目点"配置"，填 Add-on 主机+端口，自动多出 camera 实体（与单独加 proxy 二选一，同地址会冲突只留一个）。
 
 ## 文件结构
 

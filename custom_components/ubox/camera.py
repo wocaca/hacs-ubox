@@ -23,7 +23,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONF_HOST, CONF_MODE, CONF_PASSWORD, CONF_PORT, CONF_RELAY, CONF_SCAN,
-    CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_SCAN, DOMAIN, MODE_PROXY,
+    CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_SCAN, DOMAIN, MODE_CLOUD,
+    MODE_PROXY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,11 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
+    if isinstance(data, dict) and data.get("entry_kind") == MODE_CLOUD:
+        # cloud entry: optional live camera via Add-on MJPEG (host set in flow)
+        if data.get(CONF_HOST):
+            async_add_entities([UboxProxyCamera(hass, entry, data)])
+        return
     if data.get(CONF_MODE, MODE_PROXY) == MODE_PROXY:
         async_add_entities([UboxProxyCamera(hass, entry, data)])
     else:

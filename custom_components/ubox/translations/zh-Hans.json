@@ -2,7 +2,7 @@
   "flow": {
     "user": {
       "title": "UBox",
-      "description": "代理 = Add-on MJPEG 摄像头。直连 = 纯 Python P2P 摄像头。云端 = 账号设备/用户传感器。"
+      "description": "代理 = Add-on MJPEG 摄像头。直连 = 纯 Python P2P 摄像头。云端 = 账号设备/用户/快照（实时视频事后在配置里加）。"
     },
     "proxy": {
       "title": "UBox 代理摄像头",
@@ -24,12 +24,29 @@
       "description": "实验性：仅 360p IDR 快照。要 1080p 实时请用代理模式。"
     },
     "cloud": {
-      "title": "UBox 云端传感器",
+      "title": "UBox 云端（账号登录）",
       "data": {
         "account": "UBox 账号（手机/邮箱）",
         "password": "账号密码",
         "region": "区服"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UBox 实时视频",
+        "description": "Add-on MJPEG 地址，配出实时摄像头实体。主机留空=不要实时实体。",
+        "data": {
+          "host": "Add-on 主机（HASS IP，空=不要）",
+          "port": "Add-on 端口"
+        }
+      }
+    }
+  },
+  "config": {
+    "abort": {
+      "camera_no_options": "摄像头条目没有额外选项。"
     }
   },
   "error": {

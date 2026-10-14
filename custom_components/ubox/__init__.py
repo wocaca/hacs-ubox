@@ -11,8 +11,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .cloud_api import UboxApi
 from .const import (
     CONF_ACCOUNT,
+    CONF_HOST,
     CONF_PASSWORD,
+    CONF_PORT,
     CONF_REGION,
+    DEFAULT_PORT,
     DEFAULT_REGION,
     DOMAIN,
     MODE_CLOUD,
@@ -24,8 +27,12 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 
+def _merged(entry: ConfigEntry) -> dict:
+    return {**entry.data, **entry.options}
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    data = dict(entry.data)
+    data = _merged(entry)
     if data.get("entry_kind", "camera") == MODE_CLOUD or CONF_ACCOUNT in data:
         session = async_get_clientsession(hass)
         api = UboxApi(
@@ -50,8 +57,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "api": api,
             "coordinator": coordinator,
             "entry_kind": MODE_CLOUD,
+            CONF_HOST: data.get(CONF_HOST, ""),
+            CONF_PORT: int(data.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT),
         }
         await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "image"])
+        if data.get(CONF_HOST):
+            # optional live video via Add-on MJPEG, configured in options
+            await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
     else:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
         await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
@@ -64,9 +76,12 @@ async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    data = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    if isinstance(data, dict) and data.get("entry_kind") == MODE_CLOUD:
+    data = _merged(entry)
+    if isinstance(hass.data.get(DOMAIN, {}).get(entry.entry_id), dict) and (
+            data.get("entry_kind") == MODE_CLOUD or CONF_ACCOUNT in data):
         platforms = ["sensor", "image"]
+        if data.get(CONF_HOST):
+            platforms.append("camera")
     else:
         platforms = ["camera"]
     ok = await hass.config_entries.async_unload_platforms(entry, platforms)
