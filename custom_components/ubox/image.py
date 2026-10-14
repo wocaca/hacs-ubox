@@ -21,7 +21,10 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-_THUMB_KEYS = ("img_url", "image", "cover", "pic_url", "pic", "snapshot_url", "url", "thumb", "thumbnail")
+# 字段名以 APK 反编译 UbiaApiType_CloudListV2Item.java 为准：
+# hd_img_url / img_url / img（+ img_expire），别名 image 兼容自有服务器。
+_THUMB_KEYS = ("hd_img_url", "img_url", "image", "img", "cover", "pic_url", "pic",
+               "snapshot_url", "url", "thumb", "thumbnail")
 
 
 def _dev_info(dev: dict) -> DeviceInfo:
@@ -84,9 +87,12 @@ class UboxCloudImage(CoordinatorEntity, ImageEntity):
             return {"event": None, "reason": "no thumbnail url in event"}
         keep = {k: it.get(k) for k in (
             "guid", "itemid", "type", "event_type", "begin", "end",
-            "et_utc", "bt_utc", "bucket_name", "cloud_provider",
-            "cloud_provider_int", "endpoint", "image", "uid",
+            "et_utc", "bt_utc", "bucket", "bucket_name", "end_point", "endpoint",
+            "cloud_provider", "cloud_provider_int",
+            "cloud", "cp", "status", "zone_id", "img_expire",
+            "image", "uid",
         ) if it.get(k) is not None}
+        keep["thumb"] = url  # 解析到的缩略图直链，UI 里直接可验
         t = _event_time(it)
         if t is not None:
             keep["event_time"] = t.isoformat()
