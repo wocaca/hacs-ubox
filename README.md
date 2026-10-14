@@ -47,6 +47,25 @@ custom_components/ubox/
 python3 -m py_compile (Get-ChildItem -Recurse custom_components -Filter *.py).FullName
 ```
 
+## 发版流程（必做，否则 HACS 无版本可选）
+
+HACS 的版本下拉框和更新提示读的是 **GitHub Release 列表**，不是 commit。每次发版：
+
+1. 改 `custom_components/ubox/manifest.json` 的 `version`（如 `0.6.1`）。
+2. commit + push 到 main。
+3. 发 Release：tag 名与 version **完全一致**（如 `0.6.0`，不要 `v` 前缀），target 选 main。
+   ```powershell
+   # 例：发 0.6.1（GH_TOKEN 为有 repo 权限的 PAT，用完即删环境变量）
+   $env:GH_TOKEN='***'
+   $b=@{tag_name='0.6.1'; target_commitish='main'; name='0.6.1'} | ConvertTo-Json
+   Invoke-RestMethod -Method Post `
+     -Uri 'https://api.github.com/repos/wocaca/hacs-ubox/releases' `
+     -Headers @{Authorization='Bearer '+$env:GH_TOKEN; Accept='application/vnd.github+json'} `
+     -Body $b -ContentType 'application/json'
+   Remove-Item Env:\GH_TOKEN
+   ```
+4. HACS 侧"更新自定义仓库"后即出现新版本。
+
 ## 许可
 
 MIT（协议逆向部分仅供个人学习/自有设备使用）。
