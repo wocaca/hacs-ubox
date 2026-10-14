@@ -1,4 +1,4 @@
-"""UBox HACS integration entry setup: camera entries vs cloud-sensor entries."""
+"""UBox HACS integration entry setup: cloud entry with per-device cameras."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -11,7 +11,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .cloud_api import UboxApi
 from .const import (
     CONF_ACCOUNT,
+    CONF_DEVICES,
     CONF_HOST,
+    CONF_LIVE,
     CONF_PASSWORD,
     CONF_PORT,
     CONF_REGION,
@@ -21,6 +23,9 @@ from .const import (
     CONF_RELAY_UID,
     CONF_RELAY_USERNAME,
     CONF_SCAN,
+    CONF_STREAM,
+    CONF_UID,
+    CONF_USERNAME,
     DEFAULT_PORT,
     DEFAULT_REGION,
     DEFAULT_SCAN,
@@ -40,22 +45,48 @@ def _merged(entry: ConfigEntry) -> dict:
     return {**entry.data, **entry.options}
 
 
-def _relay_config(data: dict) -> dict:
-    """Options-attached relay camera config, or {} when not configured."""
-    uid = (data.get(CONF_RELAY_UID) or "").strip() if isinstance(data.get(CONF_RELAY_UID), str) else ""
-    pwd = data.get(CONF_RELAY_PASSWORD) or ""
-    relay = data.get(CONF_RELAY, "") or ""
-    if uid and pwd and ":" in str(relay):
-        from .const import CONF_STREAM, CONF_UID, CONF_USERNAME
+def _addon_host(hass: HomeAssistant) -> str:
+    """Add-on 跑在 HASS 本机：取内部 URL 的主机名，用户不用填。"""
+    try:
+        from homeassistant.helpers.network import get_url
+        from urllib.parse import urlparse
+        url = get_url(hass, allow_external=False, allow_internal=True)
+        return urlparse(url).hostname or ""
+    except Exception:  # noqa: BLE001 - detection failure means no live camera
+        return ""
+
+
+def _relay_config_for(uid: str, cfg: dict) -> dict:
+    pwd = cfg.get(CONF_RELAY_PASSWORD) or ""
+    relay = (cfg.get(CONF_RELAY) or "").strip()
+    if pwd and ":" in relay:
         return {
             CONF_UID: uid,
-            CONF_USERNAME: data.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME),
+            CONF_USERNAME: cfg.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME),
             CONF_PASSWORD: pwd,
-            CONF_RELAY: str(relay).strip(),
-            CONF_STREAM: int(data.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
-            CONF_SCAN: int(data.get(CONF_SCAN, DEFAULT_SCAN)),
+            CONF_RELAY: relay,
+            CONF_STREAM: int(cfg.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
+            CONF_SCAN: int(cfg.get(CONF_SCAN, DEFAULT_SCAN)),
         }
     return {}
+
+
+def _device_cfgs(data: dict, devices: list) -> dict:
+    """Merge per-device options with legacy global keys (migrated to first device)."""
+    cfgs = dict(data.get(CONF_DEVICES, {}) or {})
+    if not cfgs and (data.get(CONF_HOST) or data.get(CONF_RELAY_UID)):
+        target = data.get(CONF_RELAY_UID) or (devices[0].get("uid") if devices else "")
+        if target:
+            cfgs[target] = {
+                CONF_LIVE: True,
+                CONF_PORT: int(data.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT),
+                CONF_RELAY_USERNAME: data.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME),
+                CONF_RELAY_PASSWORD: data.get(CONF_RELAY_PASSWORD, ""),
+                CONF_RELAY: data.get(CONF_RELAY, ""),
+                CONF_RELAY_STREAM: int(data.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
+                CONF_SCAN: int(data.get(CONF_SCAN, DEFAULT_SCAN)),
+            }
+    return cfgs
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -80,18 +111,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             update_interval=timedelta(seconds=UPDATE_INTERVAL_SEC),
         )
         await coordinator.async_config_entry_first_refresh()
+        devices = (coordinator.data or {}).get("devices", []) or []
+        host = _addon_host(hass)
+        cfgs = _device_cfgs(data, devices)
+        live = {u: int(c.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT)
+                for u, c in cfgs.items() if c.get(CONF_LIVE) and host}
+        relay_cfgs = {u: _relay_config_for(u, c) for u, c in cfgs.items()}
+        relay_cfgs = {u: r for u, r in relay_cfgs.items() if r}
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
             "api": api,
             "coordinator": coordinator,
             "entry_kind": MODE_CLOUD,
-            CONF_HOST: data.get(CONF_HOST, ""),
-            CONF_PORT: int(data.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT),
-            "relay": _relay_config(data),
+            "addon_host": host,
+            "live": live,
+            "relay_cfgs": relay_cfgs,
+            "platforms": ["sensor", "image"] + (["camera"] if (live or relay_cfgs) else []),
         }
-        await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "image"])
-        if data.get(CONF_HOST) or _relay_config(data):
-            # optional cameras attached later via Configure
-            await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
+        store = hass.data[DOMAIN][entry.entry_id]
+        await hass.config_entries.async_forward_entry_setups(entry, store["platforms"])
     else:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = data
         await hass.config_entries.async_forward_entry_setups(entry, ["camera"])
@@ -104,12 +141,11 @@ async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    data = _merged(entry)
-    if isinstance(hass.data.get(DOMAIN, {}).get(entry.entry_id), dict) and (
-            data.get("entry_kind") == MODE_CLOUD or CONF_ACCOUNT in data):
+    store = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    if isinstance(store, dict) and store.get("entry_kind") == MODE_CLOUD:
+        platforms = store.get("platforms", ["sensor", "image"])
+    elif isinstance(store, dict) and CONF_ACCOUNT in _merged(entry):
         platforms = ["sensor", "image"]
-        if data.get(CONF_HOST) or _relay_config(data):
-            platforms.append("camera")
     else:
         platforms = ["camera"]
     ok = await hass.config_entries.async_unload_platforms(entry, platforms)

@@ -1,8 +1,7 @@
 """UBox config flow: first screen is cloud account login only.
 
-Everything else (live video via Add-on, relay P2P camera) is attached later
-from the entry's Configure button (options flow). Proxy/relay-only entries
-created by older versions keep working; new adds all start from cloud.
+Cameras attach later per device: Configure -> device list -> tap a device.
+Proxy/relay-only entries created by older versions keep working.
 """
 from __future__ import annotations
 
@@ -12,11 +11,12 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .cloud_api import UboxApi
 from .const import (
-    CONF_ACCOUNT, CONF_DEVICE, CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_REGION, CONF_RELAY,
-    CONF_RELAY_PASSWORD, CONF_RELAY_STREAM, CONF_RELAY_UID, CONF_RELAY_USERNAME,
-    CONF_SCAN, CONF_STREAM, CONF_UID, CONF_USERNAME, DEFAULT_PORT,
-    DEFAULT_REGION, DEFAULT_RELAY, DEFAULT_SCAN, DEFAULT_STREAM,
-    DEFAULT_USERNAME, DOMAIN, MODE_CLOUD, MODE_PROXY, MODE_RELAY, REGIONS,
+    CONF_ACCOUNT, CONF_DEVICE, CONF_DEVICES, CONF_HOST, CONF_LIVE, CONF_PASSWORD,
+    CONF_PORT, CONF_REGION, CONF_RELAY, CONF_RELAY_PASSWORD, CONF_RELAY_STREAM,
+    CONF_RELAY_UID, CONF_RELAY_USERNAME, CONF_SCAN, CONF_STREAM, CONF_UID,
+    CONF_USERNAME, DEFAULT_PORT, DEFAULT_REGION, DEFAULT_RELAY, DEFAULT_SCAN,
+    DEFAULT_STREAM, DEFAULT_USERNAME, DOMAIN, MODE_CLOUD, MODE_PROXY, MODE_RELAY,
+    REGIONS,
 )
 
 
@@ -76,7 +76,7 @@ class UboxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class UboxOptionsFlow(config_entries.OptionsFlow):
-    """事后配置：先选设备（UID/设备密码自动带出），再填地址。留空即不要。"""
+    """配置 = 设备列表，点进一台配它的实时/中继。Add-on 主机自动取 HASS 本机。"""
 
     def __init__(self, entry) -> None:
         self._entry = entry
@@ -84,15 +84,11 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
 
     def _devices(self) -> list:
         try:
-            from homeassistant.core import HomeAssistant  # noqa: F401
             store = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
-            data = (store.get("coordinator").data or {}) if store.get("coordinator") else {}
-            return data.get("devices", []) or []
+            coord = store.get("coordinator")
+            return ((coord.data or {}).get("devices", []) or []) if coord else []
         except Exception:  # noqa: BLE001 - coordinator missing means manual fill
             return []
-
-    def _device_map(self) -> dict:
-        return {d.get("uid", ""): (d.get("name") or d.get("uid", "")) for d in self._devices() if d.get("uid")}
 
     def _find(self, uid: str) -> dict:
         for d in self._devices():
@@ -100,57 +96,70 @@ class UboxOptionsFlow(config_entries.OptionsFlow):
                 return d
         return {}
 
+    def _saved(self) -> dict:
+        merged = {**self._entry.data, **self._entry.options}
+        return merged.get(CONF_DEVICES, {}) or {}
+
     async def async_step_init(self, user_input=None) -> FlowResult:
         if self._entry.data.get("entry_kind", MODE_CLOUD) != MODE_CLOUD:
             return self.async_abort(reason="camera_no_options")
-        merged = {**self._entry.data, **self._entry.options}
-        devs = self._device_map()
+        devs = {d.get("uid", ""): f"{d.get('name') or d.get('uid', '')}"
+                for d in self._devices() if d.get("uid")}
+        if not devs:
+            return self.async_abort(reason="no_devices")
+        if len(devs) == 1 and user_input is None:
+            self._device_uid = next(iter(devs))
+            return await self.async_step_device()
         if user_input is not None:
             self._device_uid = user_input.get(CONF_DEVICE) or ""
-            self._host = (user_input.get(CONF_HOST) or "").strip()
-            self._port = int(user_input.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT)
-            return await self.async_step_cameras()
-        default_dev = merged.get(CONF_RELAY_UID) or (next(iter(devs), ""))
-        schema: dict = {}
-        if len(devs) > 1:
-            schema[vol.Optional(CONF_DEVICE, default=default_dev)] = vol.In(devs)
-        schema[vol.Optional(CONF_HOST, default=merged.get(CONF_HOST, ""))] = str
-        schema[vol.Optional(CONF_PORT, default=merged.get(CONF_PORT, DEFAULT_PORT))] = int
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
-
-    async def async_step_cameras(self, user_input=None) -> FlowResult:
-        merged = {**self._entry.data, **self._entry.options}
-        dev = self._find(self._device_uid) if self._device_uid else {}
-        if user_input is not None:
-            r_uid = (user_input.get(CONF_RELAY_UID) or "").strip()
-            r_pwd = user_input.get(CONF_RELAY_PASSWORD) or ""
-            r_relay = (user_input.get(CONF_RELAY) or "").strip()
-            data: dict = {}
-            if getattr(self, "_host", ""):
-                data[CONF_HOST] = self._host
-                data[CONF_PORT] = getattr(self, "_port", DEFAULT_PORT)
-            if r_uid and r_pwd and ":" in r_relay:
-                data[CONF_RELAY_UID] = r_uid
-                data[CONF_RELAY_USERNAME] = user_input.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME)
-                data[CONF_RELAY_PASSWORD] = r_pwd
-                data[CONF_RELAY] = r_relay
-                data[CONF_RELAY_STREAM] = int(user_input.get(CONF_RELAY_STREAM, DEFAULT_STREAM))
-                data[CONF_SCAN] = int(user_input.get(CONF_SCAN, DEFAULT_SCAN))
-            return self.async_create_entry(title="", data=data)
-        if dev:
-            duid, dpwd = dev.get("uid", ""), dev.get("device_pwd", "")
-            duser = dev.get("device_user") or DEFAULT_USERNAME
-        else:
-            duid, dpwd, duser = merged.get(CONF_RELAY_UID, ""), merged.get(CONF_RELAY_PASSWORD, ""), DEFAULT_USERNAME
+            if self._device_uid:
+                return await self.async_step_device()
+        saved_uids = set(self._saved())
+        default = next((u for u in devs if u in saved_uids), next(iter(devs)))
         return self.async_show_form(
-            step_id="cameras",
+            step_id="init",
             data_schema=vol.Schema({
-                vol.Optional(CONF_RELAY_UID, default=duid): str,
-                vol.Optional(CONF_RELAY_USERNAME, default=merged.get(CONF_RELAY_USERNAME, duser)): str,
-                vol.Optional(CONF_RELAY_PASSWORD, default=dpwd): str,
-                vol.Optional(CONF_RELAY, default=merged.get(CONF_RELAY, DEFAULT_RELAY)): str,
-                vol.Optional(CONF_RELAY_STREAM, default=merged.get(CONF_RELAY_STREAM, DEFAULT_STREAM)): int,
-                vol.Optional(CONF_SCAN, default=merged.get(CONF_SCAN, DEFAULT_SCAN)): int,
+                vol.Required(CONF_DEVICE, default=default): vol.In(devs),
             }),
-            description_placeholders={"dev": (dev.get("name") or duid) if dev else "手动填写"},
+        )
+
+    async def async_step_device(self, user_input=None) -> FlowResult:
+        merged = {**self._entry.data, **self._entry.options}
+        dev = self._find(self._device_uid)
+        if not dev:
+            return self.async_abort(reason="no_devices")
+        uid = dev.get("uid", "")
+        cfg = (merged.get(CONF_DEVICES, {}) or {}).get(uid, {})
+        if user_input is not None:
+            all_cfg = dict((merged.get(CONF_DEVICES, {}) or {}))
+            all_cfg[uid] = {
+                CONF_LIVE: bool(user_input.get(CONF_LIVE, True)),
+                CONF_PORT: int(user_input.get(CONF_PORT, DEFAULT_PORT) or DEFAULT_PORT),
+                CONF_RELAY_USERNAME: user_input.get(CONF_RELAY_USERNAME, DEFAULT_USERNAME),
+                CONF_RELAY_PASSWORD: user_input.get(CONF_RELAY_PASSWORD) or "",
+                CONF_RELAY: (user_input.get(CONF_RELAY) or "").strip(),
+                CONF_RELAY_STREAM: int(user_input.get(CONF_RELAY_STREAM, DEFAULT_STREAM)),
+                CONF_SCAN: int(user_input.get(CONF_SCAN, DEFAULT_SCAN)),
+            }
+            # 空配置回退：实时关且中继三件套不全 = 该设备不配任何摄像头
+            return self.async_create_entry(title="", data={CONF_DEVICES: all_cfg})
+        auto_user = dev.get("device_user") or DEFAULT_USERNAME
+        auto_pwd = dev.get("device_pwd") or ""
+        online = "在线" if dev.get("online") else "离线"
+        return self.async_show_form(
+            step_id="device",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_LIVE, default=cfg.get(CONF_LIVE, True)): bool,
+                vol.Optional(CONF_PORT, default=cfg.get(CONF_PORT, DEFAULT_PORT)): int,
+                vol.Optional(CONF_RELAY_USERNAME, default=cfg.get(CONF_RELAY_USERNAME, auto_user)): str,
+                vol.Optional(CONF_RELAY_PASSWORD, default=cfg.get(CONF_RELAY_PASSWORD, auto_pwd)): str,
+                vol.Optional(CONF_RELAY, default=cfg.get(CONF_RELAY, DEFAULT_RELAY)): str,
+                vol.Optional(CONF_RELAY_STREAM, default=cfg.get(CONF_RELAY_STREAM, DEFAULT_STREAM)): int,
+                vol.Optional(CONF_SCAN, default=cfg.get(CONF_SCAN, DEFAULT_SCAN)): int,
+            }),
+            description_placeholders={
+                "name": dev.get("name") or uid,
+                "uid": uid,
+                "status": f"{online} / 电量{dev.get('battery', '?')}%",
+            },
         )

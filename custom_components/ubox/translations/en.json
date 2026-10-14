@@ -2,7 +2,7 @@
   "flow": {
     "user": {
       "title": "UBox 云端登录",
-      "description": "只输云账号密码，登录并拉设备列表。摄像头（实时/中继）事后在条目“配置”里加。",
+      "description": "只输云账号密码，登录并拉设备列表。摄像头事后在条目“配置”里按设备加。",
       "data": {
         "account": "UBox account (phone/email)",
         "password": "Account password",
@@ -13,19 +13,18 @@
   "options": {
     "step": {
       "init": {
-        "title": "UBox 选设备",
-        "description": "多设备时先选一台；UID/设备密码下一步自动带出。实时视频填 Add-on 主机（空=不要）。",
+        "title": "UBox 设备列表",
+        "description": "点一台进去配它的实时/中继。",
         "data": {
-          "device": "Device (UID auto-filled next step)",
-          "host": "Add-on host (HASS IP, empty = none)",
-          "port": "Add-on port"
+          "device": "Device"
         }
       },
-      "cameras": {
-        "title": "UBox 摄像头",
-        "description": "UID/设备密码已从 {dev} 自动带出，可改。全留空=不要中继摄像头。",
+      "device": {
+        "title": "UBox 设备配置",
+        "description": "{name} ({uid}) {status}：UID/设备密码已自动带出。实时走本机 Add-on，无需填地址。",
         "data": {
-          "relay_uid": "Camera UID (auto-filled)",
+          "live": "Live video via local Add-on",
+          "port": "Add-on port",
           "relay_username": "Device login",
           "relay_password": "Device password (auto-filled)",
           "relay": "Relay host:port",
@@ -38,7 +37,8 @@
   "config": {
     "abort": {
       "camera_no_options": "Camera entries have no extra options.",
-      "use_cloud_first": "Add the UBox cloud account first; cameras attach in Configure."
+      "use_cloud_first": "Add the UBox cloud account first; cameras attach in Configure.",
+      "no_devices": "No devices found, check account login."
     }
   },
   "error": {

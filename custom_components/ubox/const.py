@@ -23,8 +23,10 @@ DEFAULT_STREAM = 0
 DEFAULT_SCAN = 30
 DEFAULT_USERNAME = "admin"
 
-# ---- options-attached relay camera (per cloud entry) ----
+# ---- options: per-device config ----
 CONF_DEVICE = "device"
+CONF_DEVICES = "devices"
+CONF_LIVE = "live"
 CONF_RELAY_UID = "relay_uid"
 CONF_RELAY_USERNAME = "relay_username"
 CONF_RELAY_PASSWORD = "relay_password"

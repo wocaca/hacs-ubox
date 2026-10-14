@@ -17,6 +17,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
+_THUMB_KEYS = ("img_url", "image", "cover", "pic_url", "pic", "snapshot_url", "url", "thumb", "thumbnail")
+
 
 def _dev_info(dev: dict) -> DeviceInfo:
     return DeviceInfo(
@@ -59,11 +65,23 @@ class UboxCloudImage(CoordinatorEntity, ImageEntity):
             return items[0]
         return {}
 
+    def _thumb_url(self, it: dict) -> str:
+        for k in _THUMB_KEYS:
+            v = it.get(k)
+            if isinstance(v, str) and v.startswith("http"):
+                return v
+        return ""
+
     @property
     def extra_state_attributes(self):
         it = self._item()
         if not it:
-            return {"event": None}
+            items = ((self.coordinator.data.get("cloud", {}) or {}).get(self._uid, {}) or {}).get("items", []) or []
+            return {"event": None, "reason": "no cloud events in 7d" if items == [] else "event parse failed"}
+        url = self._thumb_url(it)
+        if not url:
+            _LOGGER.warning("ubox %s: event has no thumbnail url (keys=%s)", self._uid, sorted(it.keys()))
+            return {"event": None, "reason": "no thumbnail url in event"}
         keep = {k: it.get(k) for k in (
             "guid", "itemid", "type", "event_type", "begin", "end",
             "et_utc", "bt_utc", "bucket_name", "cloud_provider",
@@ -76,9 +94,9 @@ class UboxCloudImage(CoordinatorEntity, ImageEntity):
 
     async def async_image(self) -> bytes | None:
         it = self._item()
-        url = it.get("img_url") or it.get("image") or ""
+        url = self._thumb_url(it)
         guid = str(it.get("guid") or it.get("itemid") or url)
-        if not url or not isinstance(url, str):
+        if not url:
             return None
         if self._bytes is not None and guid == self._guid:
             return self._bytes
@@ -86,11 +104,14 @@ class UboxCloudImage(CoordinatorEntity, ImageEntity):
         if session is None:
             return self._bytes
         try:
-            async with session.get(url, timeout=20) as r:
+            async with session.get(url, timeout=20,
+                                   headers={"User-Agent": "Mozilla/5.0", "Referer": "https://portal-us.ubianet.com/"}) as r:
                 if r.status != 200:
+                    _LOGGER.warning("ubox %s: thumbnail http=%s", self._uid, r.status)
                     return self._bytes
                 body = await r.read()
-        except Exception:  # noqa: BLE001 - flaky signed URLs stay on last frame
+        except Exception as err:  # noqa: BLE001 - flaky signed URLs stay on last frame
+            _LOGGER.debug("ubox %s: thumbnail fetch failed: %s", self._uid, err)
             return self._bytes
         if len(body) < 500:
             return self._bytes

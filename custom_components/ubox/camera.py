@@ -35,12 +35,21 @@ async def async_setup_entry(
 ) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
     if isinstance(data, dict) and data.get("entry_kind") == MODE_CLOUD:
-        # cloud entry: cameras attached later via Configure (options)
+        # cloud entry: per-device cameras from Configure (device list)
+        store = data
+        host = store.get("addon_host", "")
+        names = {d.get("uid"): (d.get("name") or d.get("uid"))
+                 for d in ((store.get("coordinator").data or {}).get("devices", []) or [])}
         ents = []
-        if data.get(CONF_HOST):
-            ents.append(UboxProxyCamera(hass, entry, data))
-        if data.get("relay"):
-            ents.append(UboxRelayCamera(hass, entry, dict(data["relay"])))
+        for uid, port in (store.get("live", {}) or {}).items():
+            ents.append(UboxProxyCamera(
+                hass, entry, {CONF_HOST: host, CONF_PORT: port},
+                name=f"UBox {names.get(uid, uid)} 实时",
+                unique_id=f"ubox-{uid}-live"))
+        for uid, rcfg in (store.get("relay_cfgs", {}) or {}).items():
+            ents.append(UboxRelayCamera(
+                hass, entry, dict(rcfg),
+                name=f"UBox {names.get(uid, uid)} 中继"))
         if ents:
             async_add_entities(ents)
         return
@@ -53,7 +62,7 @@ async def async_setup_entry(
 class UboxProxyCamera(Camera):
     """Proxy the Add-on MJPEG server as a proper HA camera."""
 
-    def __init__(self, hass, entry, data):
+    def __init__(self, hass, entry, data, name=None, unique_id=None):
         super().__init__()
         self.hass = hass
         self._entry = entry
@@ -61,8 +70,8 @@ class UboxProxyCamera(Camera):
         port = int(data.get(CONF_PORT, 8089))
         self._mjpeg = f"http://{host}:{port}/video.mjpg"
         self._snap = f"http://{host}:{port}/snap.jpg"
-        self._attr_name = f"UBox {host}"
-        self._attr_unique_id = f"ubox-proxy-{host}-{port}"
+        self._attr_name = name or f"UBox {host}"
+        self._attr_unique_id = unique_id or f"ubox-proxy-{host}-{port}"
         self._attr_supported_features = 0
 
     @property
@@ -109,11 +118,11 @@ def _decode_h265_to_jpeg(h265: bytes, timeout=20) -> bytes | None:
 class UboxRelayCamera(Camera):
     """Experimental pure-Python relay snapshot camera (360p IDR fragment)."""
 
-    def __init__(self, hass, entry, data):
+    def __init__(self, hass, entry, data, name=None):
         super().__init__()
         self.hass = hass
         self._data = dict(data)
-        self._attr_name = f"UBox relay {data.get(CONF_UID, '')[:6]}.."
+        self._attr_name = name or f"UBox relay {data.get(CONF_UID, '')[:6]}.."
         self._attr_unique_id = f"ubox-relay-{data.get(CONF_UID)}-{data.get(CONF_RELAY)}"
         self._jpeg: bytes | None = None
         self._last_ok: float | None = None
