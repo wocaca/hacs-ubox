@@ -15,7 +15,7 @@ import subprocess
 import time
 
 import aiohttp
-from homeassistant.components.camera import Camera
+from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -72,7 +72,9 @@ class UboxProxyCamera(Camera):
         self._snap = f"http://{host}:{port}/snap.jpg"
         self._attr_name = name or f"UBox {host}"
         self._attr_unique_id = unique_id or f"ubox-proxy-{host}-{port}"
-        self._attr_supported_features = 0
+        # 必须是 Flag 类型：新 HA 在 added_to_hass 里做 `STREAM not in supported_features`，
+        # 纯 int 0 会 TypeError 导致实体加不进来（中继实体没设此项所以一直正常）。
+        self._attr_supported_features = CameraEntityFeature(0)
 
     @property
     def frame_interval(self) -> float:

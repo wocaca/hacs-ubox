@@ -53,8 +53,20 @@ class UboxCloudImage(CoordinatorEntity, ImageEntity):
     _attr_has_entity_name = True
     _attr_content_type = "image/jpeg"
 
-    def __init__(self, coordinator, dev: dict) -> None:
+    def __init__(self, coordinator, dev: dict, hass=None) -> None:
         super().__init__(coordinator)
+        # 新 HA 的 ImageEntity.__init__(hass) 才建 access_tokens；
+        # CoordinatorEntity 的 MRO 链调不到它，必须显式调一次，
+        # 否则首写 state 时 state_attributes 读 access_tokens[-1] 直接 AttributeError。
+        if hass is not None:
+            try:
+                ImageEntity.__init__(self, hass)
+            except TypeError:
+                self.access_tokens = [hex(0)]  # 极旧 HA 兼容，基本走不到
+        elif not hasattr(self, "access_tokens"):
+            from collections import deque as _dq
+            self.access_tokens = _dq(maxlen=2)
+            self.async_update_token()
         self._uid = dev["uid"]
         self._attr_unique_id = f"{DOMAIN}_{dev['uid']}_cloudimg"
         self._attr_name = "云录像快照"
@@ -133,4 +145,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add: 
     # coordinator object so data refreshes (which replace .data) don't drop it
     coordinator._ubox_session = store["api"]._s
     devices = (coordinator.data or {}).get("devices", []) or []
-    async_add([UboxCloudImage(coordinator, dev) for dev in devices])
+    async_add([UboxCloudImage(coordinator, dev, hass) for dev in devices])
